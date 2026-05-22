@@ -301,10 +301,11 @@ async function handleFindings({
     );
   }
 
+  const fixAgentLabel = config.fixAgent === "claude" ? "Claude" : "Codex";
   await setBlockedStatus({
     issueNumber,
     headSha,
-    reason: `${findingReason} A Codex fix request has been posted for this head SHA.`,
+    reason: `${findingReason} A ${fixAgentLabel} fix request has been posted for this head SHA.`,
     warnings,
   });
 }
