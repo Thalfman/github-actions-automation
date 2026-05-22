@@ -32,6 +32,11 @@ permissions:
   pull-requests: write
   issues: write
   checks: read
+  statuses: read
+
+concurrency:
+  group: codex-review-loop-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   codex-review-loop:
@@ -42,3 +47,4 @@ jobs:
       codex_quiet_window_minutes: "5"
       codex_max_fix_cycles: "3"
       codex_max_fix_cycles_per_sha: "1"
+      automation_ref: main

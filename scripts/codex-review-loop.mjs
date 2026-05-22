@@ -4,6 +4,7 @@ const API_ROOT = "https://api.github.com";
 const MARKER_PREFIX = "codex-review-loop";
 const STATUS_LABEL_BLOCKED = "ai/blocked";
 const STATUS_LABEL_READY = "ai/ready-to-merge";
+const SUCCESSFUL_CHECK_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
 
 const WARNING_LABELS = {
   security: {
@@ -280,16 +281,13 @@ async function handleReady({
   warnings,
   markers,
 }) {
-  if (!config.readyNotifyEnabled) {
-    log(`PR #${issueNumber} is ready, but CODEX_READY_NOTIFY_ENABLED is false.`);
-    return;
-  }
-
-  if (!markers.readyForHead) {
+  if (config.readyNotifyEnabled && !markers.readyForHead) {
     await createIssueComment(
       issueNumber,
       renderReady(issueNumber, headSha, approvalReaction, warnings),
     );
+  } else if (!config.readyNotifyEnabled) {
+    log(`PR #${issueNumber} is ready, but CODEX_READY_NOTIFY_ENABLED is false.`);
   }
 
   await addLabels(issueNumber, [STATUS_LABEL_READY]);
@@ -541,7 +539,9 @@ async function getCheckState(ref) {
   }
 
   const badCheck = latestCheckRuns.find(
-    (run) => run.status !== "completed" || run.conclusion !== "success",
+    (run) =>
+      run.status !== "completed" ||
+      !SUCCESSFUL_CHECK_CONCLUSIONS.has(run.conclusion),
   );
   if (badCheck) {
     return {

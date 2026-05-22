@@ -36,11 +36,17 @@ The caller workflow invokes:
 ```yaml
 uses: Thalfman/github-actions-automation/.github/workflows/codex-review-loop.yml@main
 secrets: inherit
+with:
+  automation_ref: main
 ```
 
 Keep this automation repository public so private target repositories can call
 the reusable workflow. If this repository is ever private, configure GitHub
 Actions reusable workflow access before enabling target repositories.
+
+If a target repo pins the reusable workflow to a tag or commit SHA, set
+`automation_ref` to the same ref so the checked-out script matches the called
+workflow.
 
 ## Documentation
 

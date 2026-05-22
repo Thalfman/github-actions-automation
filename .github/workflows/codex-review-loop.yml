@@ -19,12 +19,17 @@ on:
         required: false
         type: string
         default: "1"
+      automation_ref:
+        required: false
+        type: string
+        default: main
 
 permissions:
   contents: read
   pull-requests: write
   issues: write
   checks: read
+  statuses: read
 
 jobs:
   codex-review-loop:
@@ -38,6 +43,7 @@ jobs:
         with:
           repository: Thalfman/github-actions-automation
           path: .automation
+          ref: ${{ inputs.automation_ref }}
 
       - name: Run Codex review loop
         env:

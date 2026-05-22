@@ -46,6 +46,8 @@ The caller workflow invokes:
 ```yaml
 uses: Thalfman/github-actions-automation/.github/workflows/codex-review-loop.yml@main
 secrets: inherit
+with:
+  automation_ref: main
 ```
 
 Keep `Thalfman/github-actions-automation` public so private target repositories
@@ -55,6 +57,12 @@ configuration.
 If this automation repository is ever made private, configure GitHub Actions
 access settings so the intended private target repositories can use reusable
 workflows from this repository before enabling the caller workflow there.
+
+The `automation_ref` input controls which ref is checked out for the central
+script. Keep it aligned with the reusable workflow ref. For example, if the
+caller uses `.../codex-review-loop.yml@v1`, set `automation_ref: v1`; if the
+caller pins the reusable workflow to a commit SHA, set `automation_ref` to that
+same SHA.
 
 ## Review Cycle
 
@@ -121,6 +129,10 @@ Set repository variables in a target repository to tune behavior:
 - `CODEX_MAX_FIX_CYCLES_PER_SHA` overrides fix requests per head SHA.
 - `CODEX_ACTOR_LOGIN` pins the Codex actor login exactly.
 - `READY_NOTIFY_LOGIN` overrides who is mentioned in ready comments.
+
+The reusable workflow also accepts `automation_ref` as a workflow input. This is
+not a repository variable; set it in the caller workflow `with:` block when the
+caller uses a tag or SHA instead of `main`.
 
 If `CODEX_ACTOR_LOGIN` is unset, the loop matches logins containing `codex`
 case-insensitively, including `chatgpt-codex-connector`. It explicitly avoids
