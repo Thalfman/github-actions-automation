@@ -19,6 +19,14 @@ on:
         required: false
         type: string
         default: "1"
+      codex_autotrigger_review:
+        required: false
+        type: string
+        default: "true"
+      fix_agent:
+        required: false
+        type: string
+        default: "codex"
       automation_ref:
         required: false
         type: string
@@ -62,4 +70,6 @@ jobs:
           CODEX_QUIET_WINDOW_MINUTES: ${{ vars.CODEX_QUIET_WINDOW_MINUTES || inputs.codex_quiet_window_minutes }}
           CODEX_MAX_FIX_CYCLES: ${{ vars.CODEX_MAX_FIX_CYCLES || inputs.codex_max_fix_cycles }}
           CODEX_MAX_FIX_CYCLES_PER_SHA: ${{ vars.CODEX_MAX_FIX_CYCLES_PER_SHA || inputs.codex_max_fix_cycles_per_sha }}
+          CODEX_AUTOTRIGGER_REVIEW: ${{ vars.CODEX_AUTOTRIGGER_REVIEW || inputs.codex_autotrigger_review }}
+          FIX_AGENT: ${{ vars.FIX_AGENT || inputs.fix_agent }}
         run: node .automation/scripts/codex-review-loop.mjs

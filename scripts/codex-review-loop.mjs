@@ -91,7 +91,17 @@ function readConfig() {
       env("CODEX_MAX_FIX_CYCLES_PER_SHA", "1"),
       1,
     ),
+    autotriggerReview: readBoolean("CODEX_AUTOTRIGGER_REVIEW", true),
+    fixAgent: normalizeFixAgent(env("FIX_AGENT", "codex")),
   };
+}
+
+function normalizeFixAgent(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "codex" || normalized === "claude" || normalized === "none") {
+    return normalized;
+  }
+  return "codex";
 }
 
 async function processPullRequest(pr) {
@@ -174,7 +184,7 @@ async function processPullRequest(pr) {
   }
 
   if (codexReviewsForHead.length === 0) {
-    if (!markers.reviewRequestForHead) {
+    if (!markers.reviewRequestForHead && config.autotriggerReview) {
       await createIssueComment(issueNumber, renderReviewRequest(issueNumber, headSha));
     }
 
@@ -254,6 +264,16 @@ async function handleFindings({
     return;
   }
 
+  if (config.fixAgent === "none") {
+    await setBlockedStatus({
+      issueNumber,
+      headSha,
+      reason: `FIX_AGENT=none; ${findingReason}`,
+      warnings,
+    });
+    return;
+  }
+
   const totalFixCycles = markers.allFixRequests.length;
   const fixCyclesForHead = markers.fixRequestsForHead.length;
   const maxCyclesReached =
@@ -277,7 +297,7 @@ async function handleFindings({
   if (!markers.fixRequestForHead) {
     await createIssueComment(
       issueNumber,
-      renderFixRequest(issueNumber, headSha, warnings),
+      renderFixRequest(issueNumber, headSha, warnings, config.fixAgent),
     );
   }
 
@@ -363,8 +383,9 @@ function renderReviewRequest(issueNumber, headSha) {
 ${markerFor("review-request", issueNumber, headSha)}`;
 }
 
-function renderFixRequest(issueNumber, headSha, warnings) {
-  return `@codex fix the unresolved Codex review findings for the current head SHA.
+function renderFixRequest(issueNumber, headSha, warnings, agent) {
+  const mention = agent === "claude" ? "@claude" : "@codex";
+  return `${mention} fix the unresolved Codex review findings for the current head SHA.
 
 Scope:
 - Address only unresolved Codex review findings that apply to the current head SHA.

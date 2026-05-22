@@ -127,6 +127,11 @@ Set repository variables in a target repository to tune behavior:
 - `CODEX_REVIEW_LOOP_ENABLED=false` disables the loop.
 - `CODEX_FIX_ENABLED=false` disables fix requests.
 - `CODEX_READY_NOTIFY_ENABLED=false` disables ready notifications.
+- `CODEX_AUTOTRIGGER_REVIEW=false` suppresses the proactive `@codex review` ping
+  (useful when Codex Cloud already auto-reviews every push). Defaults to `true`.
+- `FIX_AGENT` selects who is asked to fix findings: `codex` (default), `claude`
+  to ping the Claude GitHub App, or `none` to skip the fix ping entirely (the
+  loop still posts a blocked-status comment listing unresolved findings).
 - `CODEX_QUIET_WINDOW_MINUTES` overrides the quiet window.
 - `CODEX_MAX_FIX_CYCLES` overrides total fix requests per PR.
 - `CODEX_MAX_FIX_CYCLES_PER_SHA` overrides fix requests per head SHA.
