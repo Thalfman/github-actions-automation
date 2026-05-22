@@ -1,0 +1,65 @@
+name: Reusable Codex Review Loop
+
+on:
+  workflow_call:
+    inputs:
+      ready_notify_login:
+        required: false
+        type: string
+        default: Thalfman
+      codex_quiet_window_minutes:
+        required: false
+        type: string
+        default: "5"
+      codex_max_fix_cycles:
+        required: false
+        type: string
+        default: "3"
+      codex_max_fix_cycles_per_sha:
+        required: false
+        type: string
+        default: "1"
+      automation_ref:
+        required: false
+        type: string
+        default: main
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+
+jobs:
+  codex-review-loop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+
+      - name: Checkout automation repository
+        uses: actions/checkout@v4
+        with:
+          repository: Thalfman/github-actions-automation
+          path: .automation
+          ref: ${{ inputs.automation_ref }}
+
+      - name: Run Codex review loop
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          CODEX_LOOP_PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || '' }}
+          CODEX_LOOP_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.check_suite.head_sha || github.event.sha || '' }}
+          CODEX_LOOP_DRY_RUN: "false"
+          CODEX_ACTOR_LOGIN: ${{ vars.CODEX_ACTOR_LOGIN }}
+          READY_NOTIFY_LOGIN: ${{ vars.READY_NOTIFY_LOGIN || inputs.ready_notify_login }}
+          CODEX_REVIEW_LOOP_ENABLED: ${{ vars.CODEX_REVIEW_LOOP_ENABLED || 'true' }}
+          CODEX_FIX_ENABLED: ${{ vars.CODEX_FIX_ENABLED || 'true' }}
+          CODEX_READY_NOTIFY_ENABLED: ${{ vars.CODEX_READY_NOTIFY_ENABLED || 'true' }}
+          CODEX_QUIET_WINDOW_MINUTES: ${{ vars.CODEX_QUIET_WINDOW_MINUTES || inputs.codex_quiet_window_minutes }}
+          CODEX_MAX_FIX_CYCLES: ${{ vars.CODEX_MAX_FIX_CYCLES || inputs.codex_max_fix_cycles }}
+          CODEX_MAX_FIX_CYCLES_PER_SHA: ${{ vars.CODEX_MAX_FIX_CYCLES_PER_SHA || inputs.codex_max_fix_cycles_per_sha }}
+        run: node .automation/scripts/codex-review-loop.mjs

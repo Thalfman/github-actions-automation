@@ -1,0 +1,50 @@
+name: Codex Review Loop
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - converted_to_draft
+  pull_request_review:
+    types:
+      - submitted
+  pull_request_review_comment:
+    types:
+      - created
+      - edited
+  issue_comment:
+    types:
+      - created
+      - edited
+  check_suite:
+    types:
+      - completed
+  status:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+
+concurrency:
+  group: codex-review-loop-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  codex-review-loop:
+    uses: Thalfman/github-actions-automation/.github/workflows/codex-review-loop.yml@main
+    secrets: inherit
+    with:
+      ready_notify_login: Thalfman
+      codex_quiet_window_minutes: "5"
+      codex_max_fix_cycles: "3"
+      codex_max_fix_cycles_per_sha: "1"
+      automation_ref: main
