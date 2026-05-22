@@ -5,6 +5,7 @@ const MARKER_PREFIX = "codex-review-loop";
 const STATUS_LABEL_BLOCKED = "ai/blocked";
 const STATUS_LABEL_READY = "ai/ready-to-merge";
 const SUCCESSFUL_CHECK_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
+const DEFAULT_CODEX_ACTOR_LOGIN = "chatgpt-codex-connector";
 
 const WARNING_LABELS = {
   security: {
@@ -39,9 +40,7 @@ if (!config.enabled) {
 await main();
 
 async function main() {
-  const prs = config.prNumber
-    ? await getSinglePullRequest(config.prNumber)
-    : await listOpenPullRequests();
+  const prs = await getPullRequestsToProcess();
 
   if (prs.length === 0) {
     log("No pull requests to process.");
@@ -73,8 +72,10 @@ function readConfig() {
     runId: env("GITHUB_RUN_ID", ""),
     eventName: env("GITHUB_EVENT_NAME", ""),
     prNumber: parseOptionalInteger(env("CODEX_LOOP_PR_NUMBER", "")),
+    headSha: env("CODEX_LOOP_HEAD_SHA", "").trim(),
     dryRun: readBoolean("CODEX_LOOP_DRY_RUN", false),
-    codexActorLogin: env("CODEX_ACTOR_LOGIN", "").trim(),
+    codexActorLogin:
+      env("CODEX_ACTOR_LOGIN", "").trim() || DEFAULT_CODEX_ACTOR_LOGIN,
     readyNotifyLogin: env("READY_NOTIFY_LOGIN", "Thalfman").trim() || "Thalfman",
     enabled: readBoolean("CODEX_REVIEW_LOOP_ENABLED", true),
     fixEnabled: readBoolean("CODEX_FIX_ENABLED", true),
@@ -195,6 +196,7 @@ async function processPullRequest(pr) {
       issueNumber,
       headSha,
       approvalReaction,
+      checkState,
       warnings,
       markers,
     });
@@ -278,13 +280,14 @@ async function handleReady({
   issueNumber,
   headSha,
   approvalReaction,
+  checkState,
   warnings,
   markers,
 }) {
   if (config.readyNotifyEnabled && !markers.readyForHead) {
     await createIssueComment(
       issueNumber,
-      renderReady(issueNumber, headSha, approvalReaction, warnings),
+      renderReady(issueNumber, headSha, approvalReaction, checkState, warnings),
     );
   } else if (!config.readyNotifyEnabled) {
     log(`PR #${issueNumber} is ready, but CODEX_READY_NOTIFY_ENABLED is false.`);
@@ -366,7 +369,7 @@ function renderMaxCycles(issueNumber, headSha) {
 ${markerFor("max-cycles", issueNumber, headSha)}`;
 }
 
-function renderReady(issueNumber, headSha, approvalReaction, warnings) {
+function renderReady(issueNumber, headSha, approvalReaction, checkState, warnings) {
   const approvalTime = approvalReaction?.created_at
     ? ` at ${approvalReaction.created_at}`
     : "";
@@ -376,7 +379,7 @@ function renderReady(issueNumber, headSha, approvalReaction, warnings) {
 PR: #${issueNumber}
 Head SHA: ${headSha}
 Codex: approved via +1 reaction on the parent PR${approvalTime}
-Checks: passing
+Checks: ${checkState.summary}
 Open Codex threads: none
 Quiet window: passed
 
@@ -414,8 +417,9 @@ function markerFor(kind, issueNumber, headSha) {
 function collectMarkers(issueComments, issueNumber, headSha) {
   const marker = (kind, sha = headSha) => markerFor(kind, issueNumber, sha);
   const allFixRequestPattern = `<!-- ${MARKER_PREFIX}:fix-request:${issueNumber}:`;
+  const trustedIssueComments = issueComments.filter(isTrustedLoopComment);
 
-  const allFixRequests = issueComments.filter((comment) =>
+  const allFixRequests = trustedIssueComments.filter((comment) =>
     comment.body?.includes(allFixRequestPattern),
   );
   const fixRequestsForHead = allFixRequests.filter((comment) =>
@@ -423,16 +427,16 @@ function collectMarkers(issueComments, issueNumber, headSha) {
   );
 
   return {
-    reviewRequestForHead: issueComments.find((comment) =>
+    reviewRequestForHead: trustedIssueComments.find((comment) =>
       comment.body?.includes(marker("review-request")),
     ),
     fixRequestForHead: fixRequestsForHead[0],
     fixRequestsForHead,
     allFixRequests,
-    maxCyclesForHead: issueComments.find((comment) =>
+    maxCyclesForHead: trustedIssueComments.find((comment) =>
       comment.body?.includes(marker("max-cycles")),
     ),
-    readyForHead: issueComments.find((comment) =>
+    readyForHead: trustedIssueComments.find((comment) =>
       comment.body?.includes(marker("ready")),
     ),
   };
@@ -533,8 +537,9 @@ async function getCheckState(ref) {
 
   if (totalSignals === 0) {
     return {
-      ready: false,
-      reason: "Waiting for checks/statuses for the current head SHA.",
+      ready: true,
+      reason: "",
+      summary: "none reported",
     };
   }
 
@@ -547,6 +552,7 @@ async function getCheckState(ref) {
     return {
       ready: false,
       reason: `Check "${badCheck.name}" is ${badCheck.status}/${badCheck.conclusion || "unknown"}.`,
+      summary: "not passing",
     };
   }
 
@@ -555,10 +561,11 @@ async function getCheckState(ref) {
     return {
       ready: false,
       reason: `Status "${badStatus.context}" is ${badStatus.state}.`,
+      summary: "not passing",
     };
   }
 
-  return { ready: true, reason: "" };
+  return { ready: true, reason: "", summary: "passing" };
 }
 
 function latestByKey(items, getKey) {
@@ -591,24 +598,12 @@ function isCodexUser(user) {
     return false;
   }
 
-  if (config.codexActorLogin) {
-    return login === config.codexActorLogin;
-  }
+  return login === config.codexActorLogin;
+}
 
-  const lowerLogin = login.toLowerCase();
-  if (
-    lowerLogin.includes("claude") ||
-    lowerLogin.includes("gemini") ||
-    lowerLogin.includes("vercel") ||
-    lowerLogin.includes("supabase") ||
-    lowerLogin === "github-actions" ||
-    lowerLogin === "github-actions[bot]" ||
-    lowerLogin.includes("github-actions")
-  ) {
-    return false;
-  }
-
-  return lowerLogin.includes("codex");
+function isTrustedLoopComment(comment) {
+  const login = comment.user?.login || "";
+  return login === "github-actions[bot]";
 }
 
 function getCommitTimestamp(commit) {
@@ -786,12 +781,32 @@ async function getSinglePullRequest(number) {
   return [pr];
 }
 
+async function getPullRequestsToProcess() {
+  if (config.prNumber) {
+    return getSinglePullRequest(config.prNumber);
+  }
+
+  if (config.headSha) {
+    return listPullRequestsForCommit(config.headSha);
+  }
+
+  return listOpenPullRequests();
+}
+
 async function listOpenPullRequests() {
   return paginate(`/repos/${config.owner}/${config.repo}/pulls`, {
     state: "open",
     sort: "updated",
     direction: "desc",
   });
+}
+
+async function listPullRequestsForCommit(ref) {
+  const prs = await paginate(
+    `/repos/${config.owner}/${config.repo}/commits/${ref}/pulls`,
+  );
+
+  return prs.filter((pr) => pr.state === "open");
 }
 
 async function getCommit(ref) {

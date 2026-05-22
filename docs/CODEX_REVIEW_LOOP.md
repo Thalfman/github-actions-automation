@@ -14,8 +14,8 @@ repository.
 - Treats every new commit as a fresh review cycle.
 - Treats a Codex `+1` reaction on the parent PR as the approval signal.
 - Requests a Codex fix when current-head Codex review findings exist.
-- Waits for passing checks/statuses and a quiet window before notifying the
-  ready reviewer.
+- Waits for passing checks/statuses when they exist and a quiet window before
+  notifying the ready reviewer.
 - Adds status labels such as `ai/blocked` and `ai/ready-to-merge`.
 - Adds warning labels for sensitive file categories when relevant.
 
@@ -83,7 +83,8 @@ The `+1` reaction is accepted only when:
 - the reaction is from Codex;
 - the reaction was created after the current head commit timestamp;
 - the current head SHA is still the latest commit;
-- checks/statuses for the current head SHA are complete and successful;
+- checks/statuses for the current head SHA are complete and successful, if any
+  are reported;
 - no current-head Codex review findings remain;
 - the quiet window has passed.
 
@@ -110,7 +111,7 @@ The ready notification requires:
 
 - latest head SHA;
 - Codex `+1` reaction on the parent PR;
-- passing checks/statuses;
+- passing checks/statuses, or no checks/statuses reported;
 - no current-head Codex review findings;
 - quiet window passed.
 
@@ -134,9 +135,13 @@ The reusable workflow also accepts `automation_ref` as a workflow input. This is
 not a repository variable; set it in the caller workflow `with:` block when the
 caller uses a tag or SHA instead of `main`.
 
-If `CODEX_ACTOR_LOGIN` is unset, the loop matches logins containing `codex`
-case-insensitively, including `chatgpt-codex-connector`. It explicitly avoids
-matching Claude, Gemini, Vercel, Supabase, or GitHub Actions actors as Codex.
+If `CODEX_ACTOR_LOGIN` is unset, the loop defaults to the exact actor login
+`chatgpt-codex-connector`. It does not use substring matching for Codex
+identity.
+
+Hidden loop markers are trusted only when posted by `github-actions[bot]`, so
+untrusted issue comments cannot spoof review, fix, max-cycle, blocked, or ready
+state.
 
 ## Sensitive File Warnings
 
