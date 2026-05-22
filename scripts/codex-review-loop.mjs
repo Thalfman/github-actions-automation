@@ -5,7 +5,10 @@ const MARKER_PREFIX = "codex-review-loop";
 const STATUS_LABEL_BLOCKED = "ai/blocked";
 const STATUS_LABEL_READY = "ai/ready-to-merge";
 const SUCCESSFUL_CHECK_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
-const DEFAULT_CODEX_ACTOR_LOGIN = "chatgpt-codex-connector";
+const DEFAULT_CODEX_ACTOR_LOGINS = new Set([
+  "chatgpt-codex-connector",
+  "chatgpt-codex-connector[bot]",
+]);
 
 const WARNING_LABELS = {
   security: {
@@ -74,8 +77,7 @@ function readConfig() {
     prNumber: parseOptionalInteger(env("CODEX_LOOP_PR_NUMBER", "")),
     headSha: env("CODEX_LOOP_HEAD_SHA", "").trim(),
     dryRun: readBoolean("CODEX_LOOP_DRY_RUN", false),
-    codexActorLogin:
-      env("CODEX_ACTOR_LOGIN", "").trim() || DEFAULT_CODEX_ACTOR_LOGIN,
+    codexActorLogin: env("CODEX_ACTOR_LOGIN", "").trim(),
     readyNotifyLogin: env("READY_NOTIFY_LOGIN", "Thalfman").trim() || "Thalfman",
     enabled: readBoolean("CODEX_REVIEW_LOOP_ENABLED", true),
     fixEnabled: readBoolean("CODEX_FIX_ENABLED", true),
@@ -192,6 +194,17 @@ async function processPullRequest(pr) {
   });
 
   if (readiness.ready) {
+    if (pr.draft) {
+      await setBlockedStatus({
+        issueNumber,
+        headSha,
+        reason:
+          "Draft PR: ready notifications and ready-to-merge labeling are skipped until the PR is ready for review.",
+        warnings,
+      });
+      return;
+    }
+
     await handleReady({
       issueNumber,
       headSha,
@@ -325,9 +338,12 @@ function getReadiness({ checkState, approvalReaction, quietWindow }) {
 
 async function setBlockedStatus({ issueNumber, headSha, reason, warnings }) {
   const comments = await listIssueComments(issueNumber);
+  const trustedComments = comments.filter(isTrustedLoopComment);
   const marker = markerFor("blocked", issueNumber, headSha);
   const body = renderBlocked(issueNumber, headSha, reason, warnings);
-  const existing = comments.find((comment) => comment.body?.includes(marker));
+  const existing = trustedComments.find((comment) =>
+    comment.body?.includes(marker),
+  );
 
   if (existing) {
     if (existing.body !== body) {
@@ -598,7 +614,11 @@ function isCodexUser(user) {
     return false;
   }
 
-  return login === config.codexActorLogin;
+  if (config.codexActorLogin) {
+    return login === config.codexActorLogin;
+  }
+
+  return DEFAULT_CODEX_ACTOR_LOGINS.has(login);
 }
 
 function isTrustedLoopComment(comment) {

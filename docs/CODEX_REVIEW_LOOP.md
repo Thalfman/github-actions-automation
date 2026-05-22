@@ -118,6 +118,8 @@ The ready notification requires:
 The workflow mentions the ready reviewer only on ready comments. Blocked and
 waiting comments do not mention the ready reviewer.
 
+Draft PRs do not receive ready notifications or `ai/ready-to-merge` labels.
+
 ## Optional Variables
 
 Set repository variables in a target repository to tune behavior:
@@ -135,9 +137,9 @@ The reusable workflow also accepts `automation_ref` as a workflow input. This is
 not a repository variable; set it in the caller workflow `with:` block when the
 caller uses a tag or SHA instead of `main`.
 
-If `CODEX_ACTOR_LOGIN` is unset, the loop defaults to the exact actor login
-`chatgpt-codex-connector`. It does not use substring matching for Codex
-identity.
+If `CODEX_ACTOR_LOGIN` is unset, the loop defaults to exact known Codex actor
+logins: `chatgpt-codex-connector` and `chatgpt-codex-connector[bot]`. It does
+not use substring matching for Codex identity.
 
 Hidden loop markers are trusted only when posted by `github-actions[bot]`, so
 untrusted issue comments cannot spoof review, fix, max-cycle, blocked, or ready
