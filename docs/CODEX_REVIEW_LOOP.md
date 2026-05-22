@@ -148,4 +148,5 @@ Sensitive files do not hard-block the loop. The workflow may add warning labels:
 - `ai/dependency-sensitive`
 
 These labels are warnings only. They do not block review requests, fix requests,
-or ready notification.
+or ready notification. The loop removes these managed warning labels when the
+current PR diff no longer contains the matching sensitive file category.

@@ -696,6 +696,15 @@ function detectWarnings(files) {
 
 async function applyWarningLabels(issueNumber, warnings) {
   await addLabels(issueNumber, warnings);
+
+  const currentWarnings = new Set(warnings);
+  const staleWarnings = Object.values(WARNING_LABELS)
+    .map((definition) => definition.label)
+    .filter((label) => !currentWarnings.has(label));
+
+  for (const label of staleWarnings) {
+    await removeLabel(issueNumber, label);
+  }
 }
 
 async function addLabels(issueNumber, labels) {
