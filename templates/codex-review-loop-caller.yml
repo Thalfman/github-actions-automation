@@ -47,4 +47,8 @@ jobs:
       codex_quiet_window_minutes: "5"
       codex_max_fix_cycles: "3"
       codex_max_fix_cycles_per_sha: "1"
+      # Set to "false" if Codex Cloud already auto-reviews every push in this repo.
+      # codex_autotrigger_review: "true"
+      # Which agent should be asked to fix Codex findings: codex (default), claude, or none.
+      # fix_agent: "codex"
       automation_ref: main
